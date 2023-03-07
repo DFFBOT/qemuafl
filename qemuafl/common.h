@@ -39,6 +39,9 @@
 #include "imported/cmplog.h"
 #include "api.h"
 
+#include "qemu/qht.h"
+
+
 /* We use one additional file descriptor to relay "needs translation"
    messages between the child and the fork server. */
 
@@ -91,6 +94,17 @@ struct vmrange {
   bool exclude; // Exclude this region rather than include it
   struct vmrange* next;
 };
+
+// <-- This is where the fun begins! -->
+// Distance struct
+// Idea: Mimic AFLGo's extended trampoline
+struct afl_go_distance {
+  long code_position;
+  s64 distance;
+};
+extern struct qht* afl_distance_hashes;
+extern abi_ulong memory_program_location;
+// <-- This is where the fun begins! -->
 
 extern struct vmrange* afl_instr_code;
 extern unsigned char  *afl_area_ptr;
@@ -171,8 +185,8 @@ static inline int is_valid_addr(target_ulong addr) {
 
 }
 
+// Adjust for the hash
 static inline int afl_must_instrument(target_ulong addr) {
-
   // Reject any exclusion regions
   for (struct vmrange* n = afl_instr_code; n; n = n->next) {
     if (n->exclude && addr < n->end && addr >= n->start)

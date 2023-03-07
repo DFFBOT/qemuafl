@@ -100,6 +100,16 @@ void HELPER(afl_maybe_log_trace)(target_ulong cur_loc) {
   INC_AFL_AREA(afl_idx);
 }
 
+static void afl_distance_log(s64 distance) {
+  unsigned char* tmp_pointer = afl_area_ptr + MAP_SIZE;
+  // First distance
+  s64* distance_ptr = (s64*) tmp_pointer;
+  *distance_ptr += distance;
+  // Second distance
+  distance_ptr += 1;
+  *distance_ptr += 1;
+}
+
 static target_ulong pc_hash(target_ulong x) {
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = ((x >> 16) ^ x) * 0x45d9f3b;
@@ -117,6 +127,9 @@ static void afl_gen_trace(target_ulong cur_loc) {
 
   if (!cur_block_is_good)
     return;
+
+  // Calcullate the memory address offset for the distance fuzzing
+  abi_ulong memory_address = cur_loc - memory_program_location;
 
   /* Looks like QEMU always maps to fixed locations, so ASLR is not a
      concern. Phew. But instruction addresses may be aligned. Let's mangle
@@ -140,6 +153,11 @@ static void afl_gen_trace(target_ulong cur_loc) {
   }
   tcg_temp_free(cur_loc_v);
 
+  struct afl_go_distance* distance_struct =
+        (struct afl_go_distance*) qht_lookup(afl_distance_hashes, &memory_address, memory_address);
+  if (distance_struct != NULL) {
+    afl_distance_log(distance_struct->distance);
+  }
 }
 
 /* #define DEBUG_TB_INVALIDATE */
@@ -2029,7 +2047,6 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
     TCGProfile *prof = &tcg_ctx->prof;
     int64_t ti;
 #endif
-
     assert_memory_lock();
     qemu_thread_jit_write();
 

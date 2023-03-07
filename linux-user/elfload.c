@@ -17,6 +17,14 @@
 
 #include "qemuafl/common.h"
 
+// "Dummy" eqaul function for qht
+// We do not to compare the values from the hash because
+// the binary offset is always unique
+static bool afl_qht_is_equal(const void *ap, const void *bp)
+{
+    return true;
+}
+
 #ifdef _ARCH_PPC64
 #undef ARCH_DLINFO
 #undef ELF_PLATFORM
@@ -2912,7 +2920,14 @@ static void load_elf_image(const char *image_name, int image_fd,
         load_symbols(ehdr, image_fd, load_bias);
     }
 
+    // Init the QHT Hashtable
+    // Can be moved otherwise
+    afl_distance_hashes = g_malloc(sizeof(struct qht));
+    qht_init(afl_distance_hashes, afl_qht_is_equal, 0, QHT_MODE_AUTO_RESIZE);
+
     if (!afl_entry_point) {
+      // Set the memory location on first start 
+      memory_program_location = load_addr;
       char *ptr;
       if ((ptr = getenv("AFL_ENTRYPOINT")) != NULL) {
         afl_entry_point = strtoul(ptr, NULL, 16);
