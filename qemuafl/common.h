@@ -103,7 +103,6 @@ struct afl_go_distance {
   s64 distance;
 };
 extern struct qht* afl_distance_hashes;
-extern abi_ulong memory_program_location;
 // <-- This is where the fun begins! -->
 
 extern struct vmrange* afl_instr_code;

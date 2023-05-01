@@ -2926,8 +2926,6 @@ static void load_elf_image(const char *image_name, int image_fd,
     qht_init(afl_distance_hashes, afl_qht_is_equal, 0, QHT_MODE_AUTO_RESIZE);
 
     if (!afl_entry_point) {
-      // Set the memory location on first start 
-      memory_program_location = load_addr;
       char *ptr;
       if ((ptr = getenv("AFL_ENTRYPOINT")) != NULL) {
         afl_entry_point = strtoul(ptr, NULL, 16);

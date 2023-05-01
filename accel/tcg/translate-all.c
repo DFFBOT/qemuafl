@@ -124,12 +124,13 @@ static void afl_gen_trace(target_ulong cur_loc) {
      Linux systems. */
 
   cur_block_is_good = afl_must_instrument(cur_loc);
-
   if (!cur_block_is_good)
     return;
 
   // Calcullate the memory address offset for the distance fuzzing
-  abi_ulong memory_address = cur_loc - memory_program_location;
+  abi_ulong memory_address = cur_loc;
+  //qemu_printf("Memory:           %X\n", memory_address);
+  //qemu_printf("Current_Location: %X\n\n", cur_loc);
 
   /* Looks like QEMU always maps to fixed locations, so ASLR is not a
      concern. Phew. But instruction addresses may be aligned. Let's mangle
