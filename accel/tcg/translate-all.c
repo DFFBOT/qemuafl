@@ -100,14 +100,17 @@ void HELPER(afl_maybe_log_trace)(target_ulong cur_loc) {
   INC_AFL_AREA(afl_idx);
 }
 
-static void afl_distance_log(s64 distance) {
+static void aflgo_distance_log(s64 distance) {
   unsigned char* tmp_pointer = afl_area_ptr + MAP_SIZE;
   // First distance
   s64* distance_ptr = (s64*) tmp_pointer;
   *distance_ptr += distance;
-  // Second distance
-  distance_ptr += 1;
-  *distance_ptr += 1;
+}
+
+static void aflgo_increase_counter() {
+  unsigned char* tmp_pointer = afl_area_ptr + MAP_SIZE + sizeof(s64);
+  s64* counter_ptr = (s64*) tmp_pointer;
+  *counter_ptr += 1;
 }
 
 static target_ulong pc_hash(target_ulong x) {
@@ -157,8 +160,9 @@ static void afl_gen_trace(target_ulong cur_loc) {
   struct afl_go_distance* distance_struct =
         (struct afl_go_distance*) qht_lookup(afl_distance_hashes, &memory_address, memory_address);
   if (distance_struct != NULL) {
-    afl_distance_log(distance_struct->distance);
+    aflgo_distance_log(distance_struct->distance);
   }
+  aflgo_increase_counter();
 }
 
 /* #define DEBUG_TB_INVALIDATE */
