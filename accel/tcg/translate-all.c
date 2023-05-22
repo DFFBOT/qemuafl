@@ -100,6 +100,8 @@ void HELPER(afl_maybe_log_trace)(target_ulong cur_loc) {
   INC_AFL_AREA(afl_idx);
 }
 
+// Increase the distance counter on the shared array
+// by the given distance
 static void aflgo_distance_log(s64 distance) {
   unsigned char* tmp_pointer = afl_area_ptr + MAP_SIZE;
   // First distance
@@ -107,6 +109,8 @@ static void aflgo_distance_log(s64 distance) {
   *distance_ptr += distance;
 }
 
+// Increase the traversed basic block counter on the shared array
+// by one
 static void aflgo_increase_counter() {
   unsigned char* tmp_pointer = afl_area_ptr + MAP_SIZE + sizeof(s64);
   s64* counter_ptr = (s64*) tmp_pointer;
@@ -130,10 +134,12 @@ static void afl_gen_trace(target_ulong cur_loc) {
   if (!cur_block_is_good)
     return;
 
-  // Calcullate the memory address offset for the distance fuzzing
-  abi_ulong memory_address = cur_loc;
-  //qemu_printf("Memory:           %X\n", memory_address);
+  // Use qemu_printf for printing the cur_loc location
   //qemu_printf("Current_Location: %X\n\n", cur_loc);
+
+  // Save the current PC counter for the distances
+  abi_ulong memory_address = cur_loc;
+  
 
   /* Looks like QEMU always maps to fixed locations, so ASLR is not a
      concern. Phew. But instruction addresses may be aligned. Let's mangle
@@ -157,11 +163,15 @@ static void afl_gen_trace(target_ulong cur_loc) {
   }
   tcg_temp_free(cur_loc_v);
 
+  // Try to fetch the distance from the given memory address
+  // and increase the distance counter
   struct afl_go_distance* distance_struct =
         (struct afl_go_distance*) qht_lookup(afl_distance_hashes, &memory_address, memory_address);
   if (distance_struct != NULL) {
     aflgo_distance_log(distance_struct->distance);
   }
+
+  // Increase the traversed basic block counter
   aflgo_increase_counter();
 }
 

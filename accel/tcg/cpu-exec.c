@@ -55,27 +55,25 @@
 #endif
 
 
-// <-- This is where the fun begins! -->
+// <-- Distance-Guided changes -->
 #include <readline/readline.h>
 #include "qemu/path.h"
 #include "qapi/error.h"
 
 // "Dummy" eqaul function for qht
 // We do not to compare the values from the hash because
-// the binary offset is always unique
+// the binary offset (PC counter or memory address) is always unique
 static bool afl_qht_is_equal(const void *ap, const void *bp)
 {
     return true;
 }
 
+// Hash table for the distances
+// As key the PC counter / memory location is used and
+// as value a struct with PC counter and distance as attributes
 struct qht *afl_distance_hashes;
 
-// Pointer of the start address of the program
-// location to calculate the offset.
-// This is used to determine the offset that is used
-// for the distance file.
-abi_ulong memory_program_location;
-// <-- This is where the fun begins! -->
+// <-- Distance-Guided changes -->
 
 
 /***************************
@@ -329,7 +327,11 @@ static void afl_map_shm_fuzz(void) {
 
 }
 
+// Function to parse the distances from the given file into
+// the hash table. afl_distance_file is the path as string of the distance file
+// and qht_ptr a pointer to the hash table (struct qht)
 static void afl_parse_aflgo_distances(char* afl_distance_file, struct qht* qht_ptr) {
+  // Try to open the file
   FILE *fp;
   Error *err = NULL;
   fp = fopen(afl_distance_file, "r");
@@ -339,11 +341,13 @@ static void afl_parse_aflgo_distances(char* afl_distance_file, struct qht* qht_p
       exit(-1);
   }
 
+  // Begin with parsing the distances by splitting by newline characters
   char* line;
   size_t len = 0;
   ssize_t read;
   bool inserted;
   while ((read = getline(&line, &len, fp)) != -1) {
+    // Begin with parsing the PC-Counter (memory address)
     char* endptr = NULL;
     long code_position = strtol(line, &endptr, 0);
 
@@ -352,20 +356,23 @@ static void afl_parse_aflgo_distances(char* afl_distance_file, struct qht* qht_p
       exit(-1);
     }
 
+    // Parse the distance
     double distance = strtod(endptr + 1, NULL);
     if (distance == 0.0) {
       qemu_printf("Warning, distance is 0.0!\n");
     }
 
+    // Malloc the relevant struct and set the values
     struct afl_go_distance* distance_ptr = malloc(sizeof(struct afl_go_distance));
     if (distance_ptr == NULL) {
       qemu_printf("Could not malloc struct afl_go_distance.");
       exit(-1);
     }
-
     distance_ptr->code_position = code_position;
     // Convert double to int with two digits of precision
     distance_ptr->distance = (int) (100.0 * distance);
+
+    // Insert the struct into the hash table
     inserted = qht_insert(qht_ptr, distance_ptr, code_position, NULL);
     if (!inserted) {
       qemu_printf("Could not create a hash entry into qht.");
@@ -373,6 +380,7 @@ static void afl_parse_aflgo_distances(char* afl_distance_file, struct qht* qht_p
     }
   }
 
+  // Close the ressources
   if (line) {
     free(line);
   }
@@ -674,10 +682,8 @@ void afl_setup(void) {
               (persistent_exits ? "exits ": ""));
   }
 
-  // Init hash table for the distance values
-  //afl_qht_init(&afl_distance_hashes, afl_qht_is_equal, 0, AFL_QHT_MODE_AUTO_RESIZE);
 
-  // Get the (aflgo) distance file and parse it
+  // Init the distances for the fuzzing
   char* afl_distance_file = getenv("AFL_DISTANCE_FILE");
   if (afl_distance_file == NULL) {
     qemu_printf("Env variable 'AFL_DISTANCE_FILE' not set!\n");
